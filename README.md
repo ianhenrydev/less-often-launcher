@@ -2,6 +2,8 @@
 
 A personal, text-only Android launcher for a Pixel 6a running Android 17 (API 37). Primary tools open immediately. Secondary apps have their own alphabetical list. Restricted packages require typing an offline quote for an independent 600-second elapsed-time window, and use whole-display grayscale while foregrounded.
 
+**MVP accepted and spec closed:** October 30, 2026, at version **0.1.1**, following the user's successful testing. The [closed MVP spec](launcher-mvp-spec.md) is the baseline for continued development; subsequent changes should use new specs. Detailed verification coverage remains in the validation report.
+
 **Current version: 0.1.1.** The update fixes color flashes during Restricted-app activity changes. The Pixel passed 32 activity transitions with zero grayscale-setting writes, exact Home restoration, real 10-minute foreground expiry, keyboard/quote checks, and same-boot process recovery. See [docs/validation.md](docs/validation.md) for evidence and the remaining manual checks. The packaged APK is `artifacts/LessOften-0.1.1-debug.apk`.
 
 ## Build

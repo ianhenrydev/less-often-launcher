@@ -2,9 +2,11 @@
 
 ## Current status — version 0.1.1
 
+**MVP accepted; spec closed October 30, 2026.** Following further personal testing, the user confirmed that the app works perfectly and explicitly accepted 0.1.1 as the MVP. The [MVP spec](../launcher-mvp-spec.md) is now the completed baseline for future development. Acceptance preserves the passed, partial and unverified evidence below; unperformed checks have not been relabeled as passed.
+
 Less Often is installed on the Pixel 6a running Android 17 / API 37, selected as Home, with its accessibility service enabled and WRITE_SECURE_SETTINGS granted. Core launcher, gate, quote, independent-deadline policy, external destinations, native notification intent/action, keyboard interaction, real foreground expiry, display restoration and process recovery have been exercised. Some acceptance checks below still require manual or further device validation; this report does not mark them passed by inference.
 
-The user reports that the launcher is working nearly perfectly and physically confirmed that the normally green battery indicator appears gray in Restricted context. The reported remaining activity-navigation color flash was reproduced and fixed in 0.1.1.
+The user physically confirmed that the normally green battery indicator appears gray in Restricted context. The activity-navigation color flash was reproduced and fixed in 0.1.1; subsequent user testing confirmed that the app works perfectly, with no outstanding user-reported MVP issues at acceptance.
 
 ## Grayscale navigation regression
 

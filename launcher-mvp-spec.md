@@ -4,13 +4,17 @@
 
 **Folder/project name:** `less-often-launcher`. Use this for the source repository/root folder and Gradle `rootProject.name`.
 
-**Status:** Product decisions and initial app buckets approved by the user. Implementation has not started.
+**Status:** Closed — implemented and accepted by the user as the MVP baseline, version **0.1.1**.
 
 **Approved:** October 30, 2026.
 
+**Accepted and closed:** October 30, 2026. After testing the installed app, the user confirmed that it works perfectly and explicitly requested closing this spec. There are no outstanding user-reported MVP issues at acceptance.
+
 **Target device:** Google Pixel 6a, stock Android 17 / API 37. The Android version and launchable package inventory were verified through read-only ADB queries.
 
-**Purpose of this document:** Give a new Codex implementation chat everything needed to build this personal launcher without reconstructing the planning conversation. The complete approved app configuration is embedded in Appendix A. A separate `app-buckets.json` contains the same configuration for convenience.
+**Purpose of this document:** Preserve the completed MVP requirements and approved app configuration as the baseline for continued development. Appendix A matches the bundled source configuration at `app/src/main/assets/app-buckets.json`. Future features and changes should be tracked in new specs starting from the accepted 0.1.1 implementation.
+
+**Closure evidence:** Implementation, APK, setup and recovery documentation are delivered. The [validation report](docs/validation.md) records automated/device results and identifies device scenarios that were not separately verified. Those coverage notes remain available for future development; the user's acceptance closes this MVP spec without changing their recorded test status.
 
 ## 1. Implementation brief
 
@@ -375,25 +379,25 @@ Automate policy tests for quote comparison/selection, independent timing, cross-
 
 Acceptance is functional. Measure and report gate transition behavior; do not invent a zero-latency guarantee. Split-screen/PiP are excluded and must not be presented as validated modes.
 
-## 12. Completion and new-chat handoff
+## 12. MVP closure and continued development
 
-The implementing chat should deliver:
+**Completed and accepted: version 0.1.1, October 30, 2026.** The user tested the installed launcher, confirmed that it works perfectly, and accepted it as the MVP.
 
-- The Android source repository with the approved configuration and offline quote corpus.
-- A reproducible Gradle build and installable APK.
-- Setup and recovery instructions, including exact ADB commands for the chosen application ID.
-- A brief validation report mapping the acceptance criteria to passed, failed, or unverified evidence.
-- Clearly documented platform limits and any remaining issues that affect daily use.
+Delivered artifacts:
 
-Suggested initial prompt for a new implementation chat:
+- Android application source in `app/`, with the exact approved buckets and bundled offline quote corpus.
+- Pinned Gradle build and [installable 0.1.1 APK](artifacts/LessOften-0.1.1-debug.apk), with a sibling SHA-256 file.
+- [Build and setup instructions](README.md), [recovery instructions](docs/recovery.md), and development-computer scripts in `scripts/`.
+- [Validation report](docs/validation.md) with passed, partial and unverified evidence, plus [repeatable acceptance procedures](docs/acceptance.md).
+- [Architecture notes](docs/architecture.md) and documented personal-use enforcement limits.
 
-> Implement the attached Less Often MVP specification. Name the app Less Often and use `less-often-launcher` for the source repository/root folder and Gradle project name. The product decisions and app buckets are approved. Begin with the Android 17 feasibility slice, then build the MVP and verify it on my Pixel 6a. Use the embedded app mapping exactly, preserve the accepted accessibility-based enforcement limits, and ask before changing product behavior if you find a concrete incompatibility. Do not reset my phone or modify unrelated apps as part of setup.
+The accepted baseline includes the activity-transition grayscale fix: the Pixel completed 32 activity transitions with zero grayscale-setting writes and restored its original display settings on Home. The implementation also passed 20 unit tests, Android lint with zero errors, a real 10-minute foreground expiry test, and same-boot process recovery checks, as detailed in the validation report.
 
-This specification is ready to implement. The remaining uncertainties are empirical Android/device behavior to investigate in Phase 1, not permission to invent different product requirements.
+Continue development from this installed 0.1.1 baseline. Define subsequent features, refinements and bug fixes in new specs; retain this document as the completed MVP reference. The existing app mapping and behavioral decisions remain authoritative until the user approves a change.
 
 ## Appendix A — complete approved app configuration
 
-The following JSON is self-contained and matches the separately supplied `app-buckets.json`. Counts: **6 Primary, 57 Secondary, 40 Restricted; 103 total**. The `primary` array is ordered. New launchable packages not listed here use `defaultBucket`.
+The following JSON is self-contained and matches `app/src/main/assets/app-buckets.json`. Counts: **6 Primary, 57 Secondary, 40 Restricted; 103 total**. The `primary` array is ordered. New launchable packages not listed here use `defaultBucket`.
 
 Friendly names were initially inferred from package IDs and approved in the bucketing exercise. Package identifiers are the authoritative mapping. Resolve the two explicitly unidentified display labels on-device without changing their buckets.
 
