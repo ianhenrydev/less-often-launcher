@@ -1,0 +1,10 @@
+.gradle/
+.kotlin/
+.tools/
+**/build/
+local.properties
+artifacts/*
+!artifacts/.gitkeep
+*.private.json
+*.hprof
+.idea/

@@ -1,0 +1,15 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <application android:label="Less Often Test Probe" android:theme="@android:style/Theme.Material.NoActionBar" android:allowBackup="false">
+        <receiver android:name=".ReplyReceiver" android:exported="false" />
+        <activity android:name=".ProbePageActivity" android:exported="true" />
+        <activity android:name=".ProbeActivity" android:exported="true" android:launchMode="singleTask">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+            <intent-filter><action android:name="android.intent.action.VIEW" /><category android:name="android.intent.category.DEFAULT" /><category android:name="android.intent.category.BROWSABLE" /><data android:scheme="lessoften-test" /></intent-filter>
+        </activity>
+        <activity-alias android:name=".OtherEntry" android:targetActivity=".ProbeActivity" android:exported="true" android:label="Less Often Probe Other Entry">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+    </application>
+</manifest>

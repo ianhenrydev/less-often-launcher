@@ -1,0 +1,3 @@
+<resources>
+    <string name="service_description">Gates Restricted apps with a typed quote and applies grayscale while they are foregrounded. Uses package and window metadata, never message or screen text. Notifications and inline actions stay native. Disable here to stop enforcement; use Less Often setup to check display recovery.</string>
+</resources>
