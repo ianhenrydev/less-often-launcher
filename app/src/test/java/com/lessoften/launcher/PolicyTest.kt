@@ -3,6 +3,7 @@ package com.lessoften.launcher
 import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
+import java.time.LocalDate
 
 class MemoryStore : DurableStore {
     val values = mutableMapOf<String, String>()
@@ -55,6 +56,34 @@ class PolicyTest {
     @Test(expected = IllegalStateException::class) fun failedCommitDoesNotGrant() {
         val store = MemoryStore().apply { fail = true }
         Sessions(store, FakeClock(), 600_000).grant("a")
+    }
+    @Test fun grantsAndCountsCommitTogetherAndSurviveRestart() {
+        val store = MemoryStore(); val clock = FakeClock(); val date = LocalDate.of(2026, 10, 30)
+        var sessions = Sessions(store, clock, 600_000, { date }, { "America/New_York" })
+        sessions.grant("a"); sessions.grant("b")
+        sessions = Sessions(store, clock, 600_000, { date }, { "America/New_York" })
+        assertEquals(1, sessions.openedToday("a")); assertEquals(2, sessions.openedToday())
+        store.fail = true
+        try { sessions.grant("a"); fail("commit must fail") } catch (_: IllegalStateException) { }
+        assertEquals(1, sessions.openedToday("a"))
+    }
+    @Test fun corruptGrantCountCannotAppearCompleteAndDoesNotPreventGrant() {
+        val date = LocalDate.of(2026, 10, 30); val store = MemoryStore(); val clock = FakeClock()
+        store.values["grantCountingStart"] = "2026-10-29|UTC"
+        store.values["grant:2026-10-30|UTC"] = "bad"
+        val sessions = Sessions(store, clock, 600_000, { date }, { "UTC" })
+        assertFalse(sessions.countReliableToday())
+        sessions.grant("a")
+        assertEquals(600_000, sessions.remaining("a")); assertEquals(1, sessions.openedToday("a"))
+        assertFalse(sessions.countReliableToday())
+    }
+    @Test fun grantCoverageIsCompleteOnlyAfterTrackingStartsAndInTheSameZone() {
+        val store = MemoryStore(); val date = LocalDate.of(2026, 10, 31)
+        store.values["grantCountingStart"] = "2026-10-29|America/New_York"
+        val sessions = Sessions(store, FakeClock(), 600_000, { date }, { "America/New_York" })
+        assertFalse(sessions.countReliable(LocalDate.of(2026, 10, 29), "America/New_York"))
+        assertTrue(sessions.countReliable(LocalDate.of(2026, 10, 30), "America/New_York"))
+        assertFalse(sessions.countReliable(date, "UTC"))
     }
     @Test fun quotesKeepPunctuationButIgnoreCaseAndWhitespace() {
         val quote = Quotes.parse(asset("quotes.json")).first()

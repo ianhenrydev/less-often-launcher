@@ -104,7 +104,8 @@ class ProbeInstrumentation : Instrumentation() {
     }
     private fun keyboard() = shell("dumpsys input_method").lineSequence().any { it.trim() == "mInputShown=true" }
     private fun clickText(text: String) {
-        var node = nodes(launcher).firstOrNull { it.text?.toString() == text } ?: error("Launcher text missing: $text")
+        // Home now also labels a usage metric "Restricted". The navigation control is the last match.
+        var node = nodes(launcher).lastOrNull { it.text?.toString() == text } ?: error("Launcher text missing: $text")
         while (!node.isClickable) node = node.parent ?: error("Not clickable: $text")
         tap(node)
     }

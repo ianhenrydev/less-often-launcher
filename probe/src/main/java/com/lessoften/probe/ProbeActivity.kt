@@ -17,6 +17,8 @@ class ProbeActivity : Activity() {
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent); render() }
     private fun render() {
         val destination = intent.dataString ?: "generic-home"
+        if (intent.getBooleanExtra("postChromeTrayTest", false)) ProbeNotifications.postChromeTrayTest(this)
+        if (intent.getBooleanExtra("cancelChromeTrayTest", false)) getSystemService(NotificationManager::class.java).cancel(52)
         setContentView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; setPadding(32, 100, 32, 32)
             addView(TextView(this@ProbeActivity).apply { text = "Destination: $destination"; textSize = 24f })
@@ -34,6 +36,14 @@ class ProbeActivity : Activity() {
 }
 
 object ProbeNotifications {
+    fun postChromeTrayTest(context: Context) {
+        val manager = context.getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(NotificationChannel("probe", "Less Often acceptance test", NotificationManager.IMPORTANCE_DEFAULT))
+        val target = Intent(Intent.ACTION_MAIN).setClassName("com.android.chrome", "com.google.android.apps.chrome.Main")
+        val pending = PendingIntent.getActivity(context, 52, target, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        manager.notify(52, Notification.Builder(context, "probe").setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("Less Often tray test").setContentText("Open the test target").setContentIntent(pending).setAutoCancel(false).build())
+    }
     fun post(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(NotificationChannel("probe", "Less Often acceptance test", NotificationManager.IMPORTANCE_DEFAULT))
@@ -56,6 +66,19 @@ class ReplyReceiver : BroadcastReceiver() {
         context.getSystemService(NotificationManager::class.java).notify(42, Notification.Builder(context, "probe")
             .setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle("Less Often synthetic notification")
             .setContentText("Inline reply received without opening the app").build())
+    }
+}
+
+/** Explicit ADB-only test target for a high-importance synthetic wake notification. */
+class WakeTestReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val manager = context.getSystemService(NotificationManager::class.java)
+        if (intent.action == "com.lessoften.probe.CANCEL_WAKE_TEST") { manager.cancel(53); return }
+        manager.createNotificationChannel(NotificationChannel("wake-test", "Less Often wake test", NotificationManager.IMPORTANCE_HIGH))
+        manager.notify(53, Notification.Builder(context, "wake-test")
+            .setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle("Less Often wake test")
+            .setContentText("Synthetic device test").setCategory(Notification.CATEGORY_MESSAGE)
+            .setPriority(Notification.PRIORITY_HIGH).setVisibility(Notification.VISIBILITY_PUBLIC).build())
     }
 }
 

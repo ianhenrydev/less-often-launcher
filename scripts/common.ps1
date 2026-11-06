@@ -17,11 +17,14 @@ function Invoke-Adb {
     return $result
 }
 function Assert-Pixel {
+    param([switch]$ValidatedDeviceOnly)
     $devices = @(Invoke-Adb devices | Where-Object { $_ -match '\sdevice$' })
     if ($devices.Count -ne 1) { throw 'Connect exactly one authorized phone with USB debugging enabled.' }
     $model = (Invoke-Adb shell getprop ro.product.model).Trim()
     $api = (Invoke-Adb shell getprop ro.build.version.sdk).Trim()
     $release = (Invoke-Adb shell getprop ro.build.version.release).Trim()
-    if ($model -ne 'Pixel 6a' -or $api -ne '37') { throw "Expected Pixel 6a API 37; found $model / Android $release / API $api" }
-    Write-Output "Verified Pixel 6a / Android $release / API $api (device identifier omitted)."
+    if ($api -notmatch '^\d+$' -or [int]$api -lt 37) { throw "Requires API 37 or newer; found $model / Android $release / API $api" }
+    if ($ValidatedDeviceOnly -and ($model -ne 'Pixel 6a' -or $api -ne '37')) { throw "Device regression tests require Pixel 6a API 37; found $model / Android $release / API $api" }
+    if ($model -ne 'Pixel 6a' -or $api -ne '37') { Write-Warning 'This device is unvalidated. Complete docs/acceptance.md before daily use.' }
+    Write-Output "Connected $model / Android $release / API $api (device identifier omitted)."
 }

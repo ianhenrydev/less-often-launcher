@@ -4,6 +4,8 @@ import java.util.Locale
 import kotlin.random.Random
 import org.json.JSONArray
 import org.json.JSONObject
+import java.time.LocalDate
+import java.time.ZoneId
 
 enum class Bucket { Primary, Secondary, Restricted }
 data class ConfiguredApp(val packageName: String, val name: String, val bucket: Bucket)
@@ -37,7 +39,8 @@ interface DurableStore {
     fun write(values: Map<String, String?>)
 }
 interface ElapsedClock { fun now(): Long; fun boot(): String? }
-class Sessions(private val store: DurableStore, private val clock: ElapsedClock, private val duration: Long) {
+class Sessions(private val store: DurableStore, private val clock: ElapsedClock, private val duration: Long,
+    private val today: () -> LocalDate = { LocalDate.now() }, private val zone: () -> String = { ZoneId.systemDefault().id }) {
     @Synchronized fun remaining(pkg: String): Long {
         val boot = clock.boot() ?: return 0
         val parts = store.get("session:$pkg")?.split('|') ?: return 0
@@ -48,8 +51,27 @@ class Sessions(private val store: DurableStore, private val clock: ElapsedClock,
     }
     @Synchronized fun grant(pkg: String) {
         val boot = requireNotNull(clock.boot()) { "Cannot determine boot identity; access remains locked" }
-        store.write(mapOf("session:$pkg" to "$boot|${clock.now() + duration}"))
+        // The count and deadline share one durable transaction: a failed commit exposes neither.
+        val date = today()
+        val key = "grant:$date|${zone()}"
+        val parsed = runCatching { JSONObject(store.get(key) ?: "{}") }
+        val counts = parsed.getOrElse { JSONObject() }
+        counts.put(pkg, counts.optInt(pkg, 0) + 1)
+        val writes = mutableMapOf<String, String?>("session:$pkg" to "$boot|${clock.now() + duration}", key to counts.toString())
+        if (parsed.isFailure) writes["grantCountingStart"] = "$date|${zone()}"
+        store.write(writes)
     }
+    fun openedToday(pkg: String? = null): Int {
+        val counts = runCatching { JSONObject(store.get("grant:${today()}|${zone()}") ?: "{}") }.getOrElse { return 0 }
+        return if (pkg != null) counts.optInt(pkg, 0) else counts.keys().asSequence().sumOf { counts.optInt(it, 0) }
+    }
+    fun countReliable(date: LocalDate, zoneId: String): Boolean {
+        val start = store.get("grantCountingStart")?.split('|') ?: return false
+        val started = runCatching { LocalDate.parse(start.first()) }.getOrNull() ?: return false
+        return start.getOrNull(1) == zoneId && started.isBefore(date) &&
+            runCatching { JSONObject(store.get("grant:$date|$zoneId") ?: "{}") }.isSuccess
+    }
+    fun countReliableToday(): Boolean = countReliable(today(), zone())
 }
 data class Quote(val id: String, val text: String, val attribution: String, val license: String, val source: String)
 class Quotes(private val corpus: List<Quote>, private val store: DurableStore) {

@@ -14,7 +14,10 @@ import android.view.inputmethod.InputMethodManager
 
 /** All transitions, commits, display writes and overlay callbacks are serialized on the main looper. */
 class GateService : AccessibilityService() {
-    companion object { var current: GateService? = null; private set }
+    companion object {
+        var current: GateService? = null; private set
+        private val iconLoader = java.util.concurrent.Executors.newSingleThreadExecutor()
+    }
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var wm: WindowManager
     private var gate: GateView? = null
@@ -143,6 +146,8 @@ class GateService : AccessibilityService() {
             cancel()
             performGlobalAction(GLOBAL_ACTION_HOME)
             // Keep Phone, Home, Settings and safety UI reachable on platform failure.
+        } finally {
+            observeCoverage()
         }
     }
     fun requestLaunch(entry: AppEntry) {
@@ -160,7 +165,13 @@ class GateService : AccessibilityService() {
         if (attempt != null) return
         val quote = state.quotes.next() // Persist selection even if attachment fails or is canceled.
         val label = target.entry?.label ?: state.catalog.entries.firstOrNull { it.packageName == target.pkg }?.label ?: target.pkg
-        val view = GateView(this, label, quote, { input -> complete(input) }, { goHome() })
+        val sessionCount = runCatching { if (state.sessions.countReliableToday()) state.sessions.openedToday(target.pkg) else null }.getOrNull()
+        val view = GateView(this, label, quote, sessionCount, { input -> complete(input) }, { goHome() })
+        val iconEntry = target.entry ?: state.catalog.entries.firstOrNull { it.packageName == target.pkg }
+        if (iconEntry != null) iconLoader.execute {
+            val icon = state.catalog.icon(iconEntry, true)
+            handler.post { if (gate === view) view.setAppIcon(icon) }
+        }
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
@@ -174,6 +185,7 @@ class GateService : AccessibilityService() {
             gravity = Gravity.TOP or Gravity.START
         }
         attempt = target; gate = view
+        observeCoverage()
         try {
             wm.addView(view, params)
             // IME consumes Back first to hide itself; Back with the keyboard closed leaves the attempt.
@@ -204,6 +216,11 @@ class GateService : AccessibilityService() {
             getSystemService(InputMethodManager::class.java).hideSoftInputFromWindow(old.windowToken, 0)
             runCatching { wm.removeViewImmediate(old) }
         }
+        observeCoverage()
+    }
+    private fun observeCoverage() {
+        // Statistics must never influence gate or display decisions.
+        runCatching { state.gateCoverage.observe(current === this && deviceAvailable && !interrupted && gate == null) }
     }
     private fun restore() {
         if (state.display.active()) {

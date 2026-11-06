@@ -8,3 +8,13 @@ artifacts/*
 *.private.json
 *.hprof
 .idea/
+*.jks
+*.keystore
+keystore.properties
+signing.properties
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+Thumbs.db

@@ -4,15 +4,22 @@ import android.content.*
 import android.content.pm.LauncherApps
 import android.os.Process
 import android.os.UserHandle
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.Paint
 import java.text.Collator
 
 data class AppEntry(val component: ComponentName, val label: String, val bucket: Bucket) {
     val packageName: String get() = component.packageName
 }
 class AppCatalog(private val context: Context, private val policy: BucketPolicy) {
+    private val icons = java.util.concurrent.ConcurrentHashMap<String, Bitmap>()
+    private val iconGeneration = java.util.concurrent.atomic.AtomicInteger()
     private val launcher = context.getSystemService(LauncherApps::class.java)
     private val listeners = mutableSetOf<() -> Unit>()
-    var entries: List<AppEntry> = emptyList(); private set
+    @Volatile var entries: List<AppEntry> = emptyList(); private set
     private val callback = object : LauncherApps.Callback() {
         override fun onPackageRemoved(packageName: String, user: UserHandle) = refresh()
         override fun onPackageAdded(packageName: String, user: UserHandle) = refresh()
@@ -24,6 +31,8 @@ class AppCatalog(private val context: Context, private val policy: BucketPolicy)
     fun listen(listener: () -> Unit) { listeners.add(listener) }
     fun unlisten(listener: () -> Unit) { listeners.remove(listener) }
     fun refresh() {
+        iconGeneration.incrementAndGet()
+        icons.clear()
         entries = launcher.getActivityList(null, Process.myUserHandle()).filter { it.componentName.packageName != context.packageName }
             .map { activity ->
                 val configured = policy.configured(activity.componentName.packageName)
@@ -32,6 +41,26 @@ class AppCatalog(private val context: Context, private val policy: BucketPolicy)
                     policy.bucket(activity.componentName.packageName))
             }.distinctBy { it.component }
         listeners.toList().forEach { it() }
+    }
+    fun icon(entry: AppEntry, grayscale: Boolean): Bitmap? {
+        val generation = iconGeneration.get()
+        val key = entry.component.flattenToString() + ":" + grayscale
+        icons[key]?.let { return it }
+        return runCatching {
+            val info = launcher.getActivityList(entry.packageName, Process.myUserHandle())
+                .first { it.componentName == entry.component }
+            val drawable = info.getIcon(context.resources.displayMetrics.densityDpi)
+            val size = (48 * context.resources.displayMetrics.density).toInt().coerceAtLeast(1)
+            val original = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+            drawable.setBounds(0, 0, size, size)
+            drawable.draw(Canvas(original))
+            val result = if (grayscale) Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).also {
+                val paint = Paint().apply { colorFilter = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(0f) }) }
+                Canvas(it).drawBitmap(original, 0f, 0f, paint)
+            } else original
+            if (iconGeneration.get() == generation) icons[key] = result
+            result
+        }.getOrNull()
     }
     fun isLaunchable(pkg: String) = entries.any { it.packageName == pkg }
     fun list(bucket: Bucket): List<AppEntry> {

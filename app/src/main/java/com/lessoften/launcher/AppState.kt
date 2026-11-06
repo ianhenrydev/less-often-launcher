@@ -5,6 +5,9 @@ import android.content.*
 import android.content.pm.PackageManager
 import android.os.SystemClock
 import android.provider.Settings
+import android.app.AppOpsManager
+import java.time.LocalDate
+import java.time.ZoneId
 
 class PreferencesStore(context: Context) : DurableStore {
     private val prefs = context.getSharedPreferences("runtime", Context.MODE_PRIVATE)
@@ -23,10 +26,25 @@ class LessOftenApp : Application() {
     lateinit var quotes: Quotes; private set
     lateinit var display: DisplayJournal; private set
     lateinit var catalog: AppCatalog; private set
+    internal lateinit var gateCoverage: GateCoverage; private set
     var failure: String? = null
+    internal var processStartedAt = 0L; private set
+    private var usageObserver: AppOpsManager.OnOpChangedListener? = null
     override fun onCreate() {
         super.onCreate()
+        processStartedAt = System.currentTimeMillis()
         store = PreferencesStore(this)
+        runCatching {
+            store.get("grantHistory")?.let { old ->
+                val history = org.json.JSONObject(old)
+                val migrated = history.keys().asSequence().mapNotNull { day ->
+                    val key = "grant:$day"
+                    if (store.get(key) == null) key to history.getJSONObject(day).toString() else null
+                }.toMap()
+                store.write(migrated + mapOf("grantHistory" to null))
+            }
+            if (store.get("grantCountingStart") == null) store.write(mapOf("grantCountingStart" to "${LocalDate.now()}|${ZoneId.systemDefault().id}"))
+        }
         policy = BucketPolicy.parse(assets.open("app-buckets.json").bufferedReader().use { it.readText() })
         quotes = Quotes(Quotes.parse(assets.open("quotes.json").bufferedReader().use { it.readText() }), store)
         sessions = Sessions(store, object : ElapsedClock {
@@ -41,7 +59,26 @@ class LessOftenApp : Application() {
             }
         })
         catalog = AppCatalog(this, policy)
+        gateCoverage = GateCoverage(this)
+        runCatching {
+            val appOps = getSystemService(AppOpsManager::class.java)
+            usageObserver = AppOpsManager.OnOpChangedListener { _, changedPackage ->
+                if (changedPackage == packageName) runCatching { invalidateUsageDay(comparisonOnly = true) }
+            }.also { appOps.startWatchingMode(AppOpsManager.OPSTR_GET_USAGE_STATS, packageName, it) }
+            registerReceiver(object : BroadcastReceiver() {
+                override fun onReceive(context: Context?, intent: Intent?) { runCatching { invalidateUsageDay() } }
+            }, IntentFilter().apply { addAction(Intent.ACTION_TIME_CHANGED); addAction(Intent.ACTION_TIMEZONE_CHANGED) }, RECEIVER_NOT_EXPORTED)
+        }.onFailure { processStartedAt = Long.MAX_VALUE }
         initialized = true
+    }
+    private fun invalidateUsageDay(comparisonOnly: Boolean = false) {
+        val zone = ZoneId.systemDefault()
+        val prefs = getSharedPreferences("usage_partial", Context.MODE_PRIVATE)
+        val day = "${LocalDate.now(zone)}|${zone.id}"
+        val edit = prefs.edit().putBoolean("${if (comparisonOnly) "comparison-invalid" else "invalid"}:$day", true)
+        if (!comparisonOnly) edit.putInt("revision:$day", prefs.getInt("revision:$day", 0) + 1)
+        edit.apply()
+        if (!comparisonOnly) runCatching { store.write(mapOf("grantCountingStart" to "${LocalDate.now(zone)}|${zone.id}")) }
     }
     fun securePermission() = checkSelfPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED
     fun capabilityProblem(): String? = when {
